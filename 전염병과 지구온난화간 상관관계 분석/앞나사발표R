@@ -1,0 +1,92 @@
+> dis=c(14970, 16052, 16070, 17513, 17998, 15382, 16974, 25010, 27620)
+> water=c(4557, 4622, 5229, 5299, 5088, 4951, 4621, 4921, 4277)
+> soil=c(196.773, 203.426, 226.573, 222.771, 244.946, 209.432, 218.874, 199.455, 214.11)
+> waste=c(374642, 388333, 394496, 393116, 401658, 418214, 429128, 429531, 449102 )
+> tem=c(121,120,122,125,134,136,136,130,129)
+> data=data.frame(dis,water,soil,waste,tem)
+> par(mfrow=c(3,3))
+> pairs(data)
+> pairs(data)
+> cor(data)
+             dis       water         soil        waste        tem
+dis    1.0000000 -0.37336335 -0.102413831  0.766301270 0.18923911
+water -0.3733633  1.00000000  0.504390997 -0.376760214 0.01352508
+soil  -0.1024138  0.50439100  1.000000000  0.009065675 0.33657762
+waste  0.7663013 -0.37676021  0.009065675  1.000000000 0.65965320
+tem    0.1892391  0.01352508  0.336577619  0.659653200 1.00000000
+> model=aov(dis~water+soil+waste+tem)
+> summary(model)
+            Df   Sum Sq  Mean Sq F value Pr(>F)  
+water        1 22730317 22730317   2.454 0.1923  
+soil         1  1613995  1613995   0.174 0.6978  
+waste        1 73586799 73586799   7.946 0.0479 *
+tem          1 28083700 28083700   3.033 0.1566  
+Residuals    4 37043197  9260799                 
+---
+Signif. codes:  0 ¡®***¡¯ 0.001 ¡®**¡¯ 0.01 ¡®*¡¯ 0.05 ¡®.¡¯ 0.1 ¡® ¡¯ 1                    
+> data1=data.frame(dis,water,waste,tem)
+> pairs(data1)
+> cor(data1)
+             dis       water      waste        tem
+dis    1.0000000 -0.37336335  0.7663013 0.18923911
+water -0.3733633  1.00000000 -0.3767602 0.01352508
+waste  0.7663013 -0.37676021  1.0000000 0.65965320
+tem    0.1892391  0.01352508  0.6596532 1.00000000
+> model1=aov(dis~water+waste+tem)
+> summary(model1)
+            Df   Sum Sq  Mean Sq F value Pr(>F)  
+water        1 22730317 22730317   3.024 0.1425  
+waste        1 74381973 74381973   9.896 0.0255 *
+tem          1 28363104 28363104   3.773 0.1097  
+Residuals    5 37582613  7516523                 
+---
+Signif. codes:  0 ¡®***¡¯ 0.001 ¡®**¡¯ 0.01 ¡®*¡¯ 0.05 ¡®.¡¯ 0.1 ¡® ¡¯ 1
+> reg.model=lm(dis~water+waste+tem)
+> summary(reg.model)
+
+Call:
+lm(formula = dis ~ water + waste + tem)
+
+Residuals:
+      1       2       3       4       5       6       7       8       9 
+ 1269.7 -1205.0 -2394.6   548.2  3165.5 -2153.9 -2635.0  2438.7   966.4 
+
+Coefficients:
+              Estimate Std. Error t value Pr(>|t|)  
+(Intercept) -2.395e+04  2.732e+04  -0.877   0.4208  
+water        1.113e+00  3.304e+00   0.337   0.7499  
+waste        2.236e-01  6.238e-02   3.585   0.0158 *
+tem         -4.230e+02  2.178e+02  -1.943   0.1097  
+---
+Signif. codes:  0 ¡®***¡¯ 0.001 ¡®**¡¯ 0.01 ¡®*¡¯ 0.05 ¡®.¡¯ 0.1 ¡® ¡¯ 1
+
+Residual standard error: 2742 on 5 degrees of freedom
+Multiple R-squared:  0.7695,    Adjusted R-squared:  0.6312 
+F-statistic: 5.564 on 3 and 5 DF,  p-value: 0.04747
+
+> reg.model1=lm(dis~waste+tem)
+> summary(reg.model1)
+
+Call:
+lm(formula = dis ~ waste + tem)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-2876.8 -1946.5   750.4   976.4  3202.4 
+
+Coefficients:
+              Estimate Std. Error t value Pr(>|t|)   
+(Intercept) -1.770e+04  1.850e+04  -0.957  0.37569   
+waste        2.128e-01  4.942e-02   4.306  0.00506 **
+tem         -3.954e+02  1.863e+02  -2.123  0.07796 . 
+---
+Signif. codes:  0 ¡®***¡¯ 0.001 ¡®**¡¯ 0.01 ¡®*¡¯ 0.05 ¡®.¡¯ 0.1 ¡® ¡¯ 1
+
+Residual standard error: 2531 on 6 degrees of freedom
+Multiple R-squared:  0.7643,    Adjusted R-squared:  0.6857 
+F-statistic: 9.727 on 2 and 6 DF,  p-value: 0.0131
+> par(mfrow=c(3,3))
+> plot(reg.model1$fitted~reg.model1$residuals);abline(h=0,lwd=2)
+> qqnorm(reg.model1$residuals);qqline(reg.model1$residuals)
+> plot(reg.model1)
+
