@@ -1,0 +1,247 @@
+---
+title: "RF_Imputation_1026"
+author: "2024021609 / Jeong Yunju"
+date: "2024-10-26"
+output: pdf_document
+---
+
+# LIBRARY
+```{r}
+library(caret)
+library(randomForest)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(VIM)
+library(readxl)
+library(mice)
+library(rpart)
+```
+
+
+# DATA
+```{r}
+mar10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mar10_hd.csv")
+
+mar40 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mar40_hd.csv")
+
+mcar10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mcar10_hd.csv")
+
+mcar40 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mcar40_hd.csv")
+
+mnar10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mnar10_hd.csv")
+
+mnar40 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mnar40_hd.csv")
+```
+
+# preprocessing
+```{r}
+mar10 = mar10[,!grepl("imp",names(mar10))]
+mar40 = mar40[,!grepl("imp",names(mar40))]
+mcar10 = mcar10[,!grepl("imp",names(mcar10))]
+mcar40 = mcar40[,!grepl("imp",names(mcar40))]
+mnar10 = mnar10[,!grepl("imp",names(mnar10))]
+mnar40 = mnar40[,!grepl("imp",names(mnar40))]
+```
+
+# RF
+```{r}
+set.seed(715)
+rf_mar10 = randomForest(factor(m)~.,data=mar10%>%select(-HE_glu),var.importance=TRUE)
+importance_val = importance(rf_mar10)
+importance_df = data.frame(Variable=rownames(importance_val), Importance=importance_val[,1])
+importance_plot = ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "MAR 10 Variable Importance", x = "Variables", y = "Importance") +
+  theme_minimal()  +
+  theme(panel.background = element_rect(fill = "white"),
+        plot.background = element_rect(fill = "white"), 
+        panel.grid.major = element_line(color = "lightgray"), 
+        panel.grid.minor = element_line(color = "lightgray"))
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\feature_importance\\mar10.png", plot = importance_plot, width = 10, height = 6, dpi = 300)
+
+rf_mar40 = randomForest(factor(m)~.,data=mar40%>%select(-HE_glu),var.importance=TRUE)
+importance_val = importance(rf_mar40)
+importance_df = data.frame(Variable=rownames(importance_val), Importance=importance_val[,1])
+importance_plot = ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "MAR 40 Variable Importance", x = "Variables", y = "Importance") +
+  theme_minimal() +
+  theme(panel.background = element_rect(fill = "white"),
+        plot.background = element_rect(fill = "white"), 
+        panel.grid.major = element_line(color = "lightgray"), 
+        panel.grid.minor = element_line(color = "lightgray"))
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\feature_importance\\mar40.png", plot = importance_plot, width = 10, height = 6, dpi = 300)
+
+rf_mcar10 = randomForest(factor(m)~.,data=mcar10%>%select(-HE_glu),var.importance=TRUE)
+importance_val = importance(rf_mcar10)
+importance_df = data.frame(Variable=rownames(importance_val), Importance=importance_val[,1])
+importance_plot = ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "MCAR 10 Variable Importance", x = "Variables", y = "Importance") +
+  theme_minimal() + theme(panel.background = element_rect(fill = "white"),
+        plot.background = element_rect(fill = "white"), 
+        panel.grid.major = element_line(color = "lightgray"), 
+        panel.grid.minor = element_line(color = "lightgray"))
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\feature_importance\\mcar10.png", plot = importance_plot, width = 10, height = 6, dpi = 300)
+
+rf_mcar40 = randomForest(factor(m)~.,data=mar40%>%select(-HE_glu),var.importance=TRUE)
+importance_val = importance(rf_mcar40)
+importance_df = data.frame(Variable=rownames(importance_val), Importance=importance_val[,1])
+importance_plot = ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "MCAR 40 Variable Importance", x = "Variables", y = "Importance") +
+  theme_minimal() + theme(panel.background = element_rect(fill = "white"),
+        plot.background = element_rect(fill = "white"), 
+        panel.grid.major = element_line(color = "lightgray"), 
+        panel.grid.minor = element_line(color = "lightgray"))
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\feature_importance\\mcar40.png", plot = importance_plot, width = 10, height = 6, dpi = 300)
+
+rf_mnar10 = randomForest(factor(m)~.,data=mnar10%>%select(-HE_glu),var.importance=TRUE)
+importance_val = importance(rf_mnar10)
+importance_df = data.frame(Variable=rownames(importance_val), Importance=importance_val[,1])
+importance_plot = ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "MNAR 10 Variable Importance", x = "Variables", y = "Importance") +
+  theme_minimal() + theme(panel.background = element_rect(fill = "white"),
+        plot.background = element_rect(fill = "white"), 
+        panel.grid.major = element_line(color = "lightgray"), 
+        panel.grid.minor = element_line(color = "lightgray"))
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\feature_importance\\mnar10.png", plot = importance_plot, width = 10, height = 6, dpi = 300)
+
+rf_mnar40 = randomForest(factor(m)~.,data=mnar40%>%select(-HE_glu),var.importance=TRUE)
+importance_val = importance(rf_mnar40)
+importance_df = data.frame(Variable=rownames(importance_val), Importance=importance_val[,1])
+importance_plot = ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "MNAR 40 Variable Importance", x = "Variables", y = "Importance") +
+  theme_minimal() + theme(panel.background = element_rect(fill = "white"),
+        plot.background = element_rect(fill = "white"), 
+        panel.grid.major = element_line(color = "lightgray"), 
+        panel.grid.minor = element_line(color = "lightgray"))
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\feature_importance\\mnar40.png", plot = importance_plot, width = 10, height = 6, dpi = 300)
+```
+
+
+# Tree 개수 (default = 10, subjective = 1000)
+
+```{r}
+mar10 = mar10 %>% select(-m)
+mar40 = mar40 %>% select(-m)
+
+mcar10 = mcar10 %>% select(-m)
+mcar40 = mcar40 %>% select(-m)
+
+mnar10 = mnar10 %>% select(-m)
+mnar10 = mnar40 %>% select(-m)
+```
+
+```{r}
+set.seed(715)
+rf_impute <- function(data, target, n, m) {
+  # 결측치의 인덱스 추출
+  na_indices <- which(is.na(data[[target]]))
+  
+  # 대체 값을 저장할 매트릭스 생성
+  imputed_values_matrix <- matrix(NA, nrow = nrow(data), ncol = m)
+  
+  for (i in 1:m) {
+    # mice.impute.rf로 결측치 대체
+    y <- data[[target]]
+    ry <- !is.na(y)
+    x <- data[, !(names(data) %in% target)]
+    
+    imputed_values <- mice.impute.rf(y = y, ry = ry, x = x, ntree = n)
+    
+    # 대체 값을 매트릭스에 저장
+    imputed_values_matrix[, i] <- ifelse(is.na(data[[target]]), imputed_values, data[[target]])
+  }
+  
+  # 데이터프레임으로 변환
+  imputed_values_df <- as.data.frame(imputed_values_matrix)
+  colnames(imputed_values_df) <- paste0(target, "_imputed_", 1:m)
+  
+  return(imputed_values_df)  # 수정된 대체 값 데이터프레임 반환
+}
+
+#대규모 데이터셋을 처리하기 위해 ranger를 활용 (default), 그렇지 않은 데이터였다면 rfPackage="randomForest"꼴로 활용은 할 수 있음
+
+mar10_rf10 = rf_impute(mar10, "HE_glu",n=10,m=5)
+#mar10_rf1000 = rf_impute(mar10, "HE_glu",n=1000,m=5)
+
+mar40_rf10 = rf_impute(mar40, "HE_glu",n=10,m=5)
+#mar40_rf1000 = rf_impute(mar40, "HE_glu",n=1000,m=5)
+
+mcar10_rf10 = rf_impute(mcar10, "HE_glu",n=10,m=5)
+#mcar10_rf1000 = rf_impute(mcar10, "HE_glu",n=1000,m=5)
+
+mcar40_rf10 = rf_impute(mcar40, "HE_glu",n=10,m=5)
+#mcar40_rf1000 = rf_impute(mcar40, "HE_glu",n=1000,m=5)
+
+mnar10_rf10 = rf_impute(mnar10, "HE_glu",n=10,m=5)
+#mnar10_rf1000 = rf_impute(mnar10, "HE_glu",n=1000,m=5)
+
+mnar40_rf10 = rf_impute(mnar40, "HE_glu",n=10,m=5)
+#mnar40_rf1000 = rf_impute(mnar40, "HE_glu",n=1000,m=5)
+```
+
+# pmm
+```{r}
+set.seed(715)
+impute_pmm <- function(data, target, m = 5) {
+  # mice를 이용하여 imputation 수행
+  imputed_data <- mice(data, m = m, method = 'pmm', maxit = 5, printFlag = FALSE)
+
+  # 대체 값을 저장할 데이터프레임 생성
+  imputed_values_df <- data.frame(matrix(ncol = m, nrow = nrow(data)))
+  colnames(imputed_values_df) <- paste0(target, "_imputed_", 1:m)
+
+  for (i in 1:m) {
+    complete_data <- complete(imputed_data, i)
+    # HE_glu 대체 값 저장
+    imputed_values_df[, i] <- ifelse(is.na(data[[target]]), complete_data[[target]], data[[target]])
+  }
+
+  # HE_glu 대체 값만 포함된 데이터프레임 반환
+  return(imputed_values_df)
+}
+
+
+mar10_pmm = impute_pmm(mar10,"HE_glu",m=5)
+mar40_pmm = impute_pmm(mar40,"HE_glu",m=5)
+
+mcar10_pmm = impute_pmm(mcar10,"HE_glu",m=5)
+mcar40_pmm = impute_pmm(mcar40,"HE_glu",m=5)
+
+mnar10_pmm = impute_pmm(mnar10,"HE_glu",m=5)
+mnar40_pmm = impute_pmm(mnar40,"HE_glu",m=5)
+```
+
+# save
+```{r}
+write.csv(mar10_rf10, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mar10_rf10.csv", row.names = FALSE)
+write.csv(mar40_rf10, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mar40_rf10.csv", row.names = FALSE)
+
+write.csv(mcar10_rf10, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mcar10_rf10.csv", row.names = FALSE)
+write.csv(mcar40_rf10, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mcar40_rf10.csv", row.names = FALSE)
+
+write.csv(mnar10_rf10, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mnar10_rf10.csv", row.names = FALSE)
+write.csv(mnar40_rf10, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mnar40_rf10.csv", row.names = FALSE)
+
+write.csv(mar10_pmm, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mar10_pmm.csv", row.names = FALSE)
+write.csv(mar40_pmm, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mar40_pmm.csv", row.names = FALSE)
+
+write.csv(mcar10_pmm, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mcar10_pmm.csv", row.names = FALSE)
+write.csv(mcar40_pmm, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mcar40_pmm.csv", row.names = FALSE)
+
+write.csv(mnar10_pmm, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mnar10_pmm.csv", row.names = FALSE)
+write.csv(mnar40_pmm, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mnar40_pmm.csv", row.names = FALSE)
+
+```
+

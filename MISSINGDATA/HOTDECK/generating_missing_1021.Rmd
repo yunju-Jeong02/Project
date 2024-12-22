@@ -1,0 +1,278 @@
+---
+title: "GENERATE_MISSING_1021"
+author: "2024021609 / Jeong Yunju"
+date: "2024-10-21"
+output: pdf_document
+header-includes:
+- \usepackage{amsmath,amssymb}
+- \usepackage{amsfonts}
+- \usepackage{graphicx}
+- \usepackage{bm}
+- \usepackage{kotex}
+- \usepackage[shortlabels]{enumitem}
+- \usepackage{diagbox}
+---
+
+```{r,warning=FALSE}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(MatchIt)
+library(readxl)
+```
+
+#DATA
+```{r}
+final = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\final_drop1to9.csv")
+complete = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete.csv")
+final = final[,-1]
+complete = complete[, -1]
+```
+
+# 기준은 X에 대해 공통적 처리.
+```{r}
+set.seed(715)
+#complete 전처리
+#full에 대한 logistic regression
+complete1 = complete #원본
+#age categorized
+complete$age = ifelse(complete$age<20,1,ifelse(complete$age >= 40,3,2)) 
+#de1_dg replace
+ind_8 = which(complete$DE1_dg==8)
+complete$DE1_dg[ind_8] = 0
+
+#NA를 대체..해야함 (nrow 기준 17개 차이남 -> randomsampling함)
+complete[is.na(complete$age),]
+complete[is.na(complete$DE1_dg),]['DE1_dg'] = sample(c(0,1),1,prob=c(0.5,0.5))
+
+#income에 대한 대체
+sum1=sum(complete[complete$age == 1, "incm5"] == 1,na.rm=TRUE)
+sum2=sum(complete[complete$age == 1, "incm5"] == 2,na.rm=TRUE)
+sum3=sum(complete[complete$age == 1, "incm5"] == 3,na.rm=TRUE)
+sum4=sum(complete[complete$age == 1, "incm5"] == 4,na.rm=TRUE)
+sum5=sum(complete[complete$age == 1, "incm5"] == 5,na.rm=TRUE)
+
+#가중치 주고 뽑기(age=1)
+total_sum = sum(sum1, sum2, sum3, sum4, sum5)
+prob = c(sum1, sum2, sum3, sum4, sum5) / total_sum
+n = nrow(complete[complete$age == 1 & is.na(complete$incm5), ])
+complete[complete$age == 1 & is.na(complete$incm5), ]['incm5'] = sample(1:5,n,prob=prob,replace=TRUE)
+
+#age=2
+sum1=sum(complete[complete$age == 2, "incm5"] == 1,na.rm=TRUE)
+sum2=sum(complete[complete$age == 2, "incm5"] == 2,na.rm=TRUE)
+sum3=sum(complete[complete$age == 2, "incm5"] == 3,na.rm=TRUE)
+sum4=sum(complete[complete$age == 2, "incm5"] == 4,na.rm=TRUE)
+sum5=sum(complete[complete$age == 2, "incm5"] == 5,na.rm=TRUE)
+
+#가중치 주고 뽑기(age=2)
+total_sum = sum(sum1, sum2, sum3, sum4, sum5)
+prob = c(sum1, sum2, sum3, sum4, sum5) / total_sum
+n = nrow(complete[complete$age == 2 & is.na(complete$incm5), ])
+complete[complete$age == 2 & is.na(complete$incm5), ]['incm5'] = sample(1:5,n,prob=prob,replace=TRUE)
+
+#age=2
+sum1=sum(complete[complete$age == 3, "incm5"] == 1,na.rm=TRUE)
+sum2=sum(complete[complete$age == 3, "incm5"] == 2,na.rm=TRUE)
+sum3=sum(complete[complete$age == 3, "incm5"] == 3,na.rm=TRUE)
+sum4=sum(complete[complete$age == 3, "incm5"] == 4,na.rm=TRUE)
+sum5=sum(complete[complete$age == 3, "incm5"] == 5,na.rm=TRUE)
+
+#가중치 주고 뽑기(age=2)
+total_sum = sum(sum1, sum2, sum3, sum4, sum5)
+prob = c(sum1, sum2, sum3, sum4, sum5) / total_sum
+n = nrow(complete[complete$age == 3 & is.na(complete$incm5), ])
+complete[complete$age == 3 & is.na(complete$incm5), ]['incm5'] = sample(1:5,n,prob=prob,replace=TRUE)
+
+
+#HE_anem 대체
+sum1=sum(complete[complete$sex == 1, "HE_anem"] == 0,na.rm=TRUE)
+sum2=sum(complete[complete$sex == 1, "HE_anem"] == 1,na.rm=TRUE)
+
+#가중치 주고 뽑기(sex=1 : 남자)
+total_sum = sum(sum1, sum2)
+prob = c(sum1, sum2) / total_sum
+n = nrow(complete[complete$sex == 1 & is.na(complete$HE_anem), ])
+complete[complete$sex == 1 & is.na(complete$HE_anem), ]['HE_anem'] = sample(c(0,1),n,prob=prob,replace=TRUE)
+
+#HE_anem 대체
+sum1=sum(complete[complete$sex == 2, "HE_anem"] == 0,na.rm=TRUE)
+sum2=sum(complete[complete$sex == 2, "HE_anem"] == 1,na.rm=TRUE)
+
+#가중치 주고 뽑기(sex=2 : 여자)
+total_sum = sum(sum1, sum2)
+prob = c(sum1, sum2) / total_sum
+n = nrow(complete[complete$sex == 2 & is.na(complete$HE_anem), ])
+complete[complete$sex == 2 & is.na(complete$HE_anem), ]['HE_anem'] = sample(c(0,1),n,prob=prob,replace=TRUE)
+```
+
+# MCAR
+```{r}
+set.seed(715)
+#10% missing
+complete_mcar10 = complete
+complete_mcar10$age = complete1$age
+
+n_10 = nrow(complete)*0.1
+mcar_10 = sample(1:nrow(complete),n_10, replace=FALSE)
+complete_mcar10$HE_glu[mcar_10] = NA
+sum(is.na(complete_mcar10$HE_glu))
+write.csv(complete_mcar10, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mcar10.csv", row.names = FALSE)
+
+#40% missing
+complete_mcar40 = complete
+complete_mcar40$age = complete1$age
+n_40 = nrow(complete)*0.4
+mcar_40 = sample(1:nrow(complete),n_40, replace=FALSE)
+complete_mcar40$HE_glu[mcar_40] = NA
+sum(is.na(complete_mcar40$HE_glu))
+write.csv(complete_mcar40, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mcar40.csv", row.names = FALSE)
+```
+
+
+# MAR
+# logistic modeling
+```{r}
+#full에 대한 logistic regression
+final_logistic = final
+#age categorized
+final_logistic$age = ifelse(final_logistic$age<20,1,ifelse(final_logistic$age >= 40,3,2)) 
+#질병관리청기준 (60으로 했을 때는 logistic값 차이 크지 않았음)
+#https://health.kdca.go.kr/healthinfo/biz/health/gnrlzHealthInfo/gnrlzHealthInfo/gnrlzHealthInfoView.do?cntnts_sn=5305
+#de1_dg replace
+ind_8 = which(final_logistic$DE1_dg==8)
+final_logistic$DE1_dg[ind_8] = 0
+#make m = missing
+final_logistic$m <- ifelse(is.na(final_logistic$HE_glu), 1, 0)
+
+lmodel = glm(m ~ factor(age)+HE_anem+DE1_dg+factor(incm5), family=binomial, data=final_logistic)
+summary(lmodel)
+```
+
+logistic에서의 warning은 여러 이유가 있음
+
+by gpt
+1. 데이터 불균형
+2. perfect separation : 독립변수들로 종속 변수를 완벽하게 예측가능 -> 이건 아닐것
+3. 과도하게 큰 예측값 : 서로 상관관계가 높거나 특정 값 범위 매우 클때
+4. 독립변수의 scaling 문제
+
+굳이 안해도는 되지만 이러한 문제를 어느정도 반영한 코드로 비교해보겠음.
+
+```{r}
+set.seed(715)
+logistic_model <- glm(m ~ factor(incm5) + HE_anem+DE1_dg +factor(age), data = final_logistic, family = binomial, control = list(maxit = 100))
+summary(logistic_model)
+```
+
+여러변수가 섞인 효과라 원하는 시나리오가 아닌듯 하나씩 체크 (원래는 안되지만 그냥 참고용이므로)
+```{r}
+model1 <- glm(m ~ factor(incm5), data = final_logistic, family = binomial, control = list(maxit = 100))
+summary(model1)
+```
+시나리오와 동일한 결과 (incm 높을수록 덜 missing)
+
+```{r}
+model2 <- glm(m ~ HE_anem, data = final_logistic, family = binomial, control = list(maxit = 100))
+summary(model2)
+```
+빈혈있을수록 덜 결측 -> 병원자주가서 그런것 아닐까 하는 생각
+
+```{r}
+model3 <- glm(m ~ DE1_dg, data = final_logistic, family = binomial, control = list(maxit = 100))
+summary(model3)
+```
+당뇨병있을수록 결측잘 됨.
+
+```{r}
+model4 <- glm(m ~ factor(age), data = final_logistic, family = binomial, control = list(maxit = 100))
+summary(model4)
+```
+age 1 즉, 십대일수록 결측 높음!
+
+생각보다 60세 이상은 의미 없을수도 -> 40으로 고쳤는데, 뭐 엄청 차이는 없지만,, 그래도 음.. 20~40보다는 결측 비율이 높음을 확인할 수 있음
+
+#propensity score model
+
+
+
+```{r}
+complete$age = factor(complete$age)
+complete$incm5 = factor(complete$incm5)
+
+z = model.matrix(~incm5+age+HE_anem+DE1_dg, data=complete)
+head(z)
+
+#변수 구성이 좀 어려움 ... 바꾸면 되니까 머..
+component = -0.3 * z[, 2] - 0.5 * z[, 3] - 0.6 * z[, 4] - 0.8 * z[, 5] - 1.8 * z[, 6] - 1.2 * z[, 7] - 0.01 * z[, 8] + 0.45 * z[, 9]
+complete$propensity = exp(component)/(1+exp(component)) #적절한질 모르겠음..
+```
+
+```{r}
+set.seed(715)
+#사분위수 구하기
+complete$quartile <- cut(complete$propensity,
+                          breaks = quantile(complete$propensity, probs = seq(0, 1, 0.25)),
+                          include.lowest = TRUE,
+                          labels = 1:4)
+
+#  그룹별 가중치 부여
+weights <- 1:4  # 1분위수에 가장 낮은 가중치
+complete$weight <- as.numeric(as.character(complete$quartile))
+complete$weight <- weights[complete$weight]
+
+# 인덱스 샘플링
+#10%
+mar_10<- sample(1:nrow(complete), size = 0.1*nrow(complete), prob = complete$weight, replace = FALSE)
+complete_mar10 = complete
+complete_mar10$age = complete1$age
+complete_mar10$HE_glu[mar_10] = NA
+complete_mar10 <- complete_mar10 %>%  select(-propensity, -quartile, -weight)
+sum(is.na(complete_mar10$HE_glu))
+write.csv(complete_mar10, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mar10.csv", row.names = FALSE)
+
+#40%
+mar_40<- sample(1:nrow(complete), size = 0.4*nrow(complete), prob = complete$weight, replace = FALSE)
+complete_mar40 = complete
+complete_mar40$age = complete1$age
+complete_mar40$HE_glu[mar_40] = NA
+complete_mar40 <- complete_mar40 %>%  select(-propensity, -quartile, -weight)
+sum(is.na(complete_mar40$HE_glu))
+write.csv(complete_mar40, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mar40.csv", row.names = FALSE)
+
+
+# 샘플링 결과 확인
+length(mar_10)
+length(mar_40)
+
+#sampling에 썼던 열 제거
+complete <- complete %>%  select(-propensity, -quartile, -weight)
+```
+
+
+# MNAR
+logistic 결과에서 당뇨병이 있을수록 결측이 높았기에 이를 반영 -> 공복혈당이 126이상이면 더 높은 가중치를 주도록록
+```{r}
+set.seed(715)
+complete$glu <- ifelse(complete$HE_glu > 126, 1, 0)
+complete$weight <- ifelse(complete$glu == 1, 2, 1)#glu=1이면 가중치 2배
+
+#10%
+mnar_10 <- sample(1:nrow(complete), size = 0.1*nrow(complete), replace = FALSE, prob = complete$weight)
+complete_mnar10 = complete
+complete_mnar10$age = complete1$age
+complete_mnar10$HE_glu[mnar_10] = NA
+complete_mnar10 = complete_mnar10 %>% select(-weight,-glu)
+sum(is.na(complete_mnar10$HE_glu))
+write.csv(complete_mnar10, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mnar10.csv", row.names = FALSE)
+
+#40%
+mnar_40 <- sample(1:nrow(complete), size = 0.4*nrow(complete), replace = FALSE, prob = complete$weight)
+complete_mnar40 = complete
+complete_mnar40$age = complete1$age
+complete_mnar40$HE_glu[mnar_40] = NA
+complete_mnar40 = complete_mnar40 %>% select(-weight,-glu)
+sum(is.na(complete_mnar40$HE_glu))
+write.csv(complete_mnar40, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mnar40.csv", row.names = FALSE)
+```
+

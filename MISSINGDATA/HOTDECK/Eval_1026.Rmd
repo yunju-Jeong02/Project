@@ -1,0 +1,247 @@
+---
+title: "Eval_1026"
+author: "2024021609 / Jeong Yunju"
+date: "2024-10-26"
+output: pdf_document
+---
+
+# LIBRARY
+```{r}
+library(caret)
+library(randomForest)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(VIM)
+library(readxl)
+library(mice)
+library(rpart)
+library(ehaGoF)
+#gofRRMSE(true,rowMeans(data),dgt=5)
+```
+
+
+# DATA
+```{r}
+mnar40_pmm = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mnar40_pmm.csv")
+complete=read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete.csv")
+```
+
+```{r}
+true = complete$HE_glu
+```
+
+# bias, variance (considering multiple imputation),rmse, rrmse
+
+rrmse 계산참고 : https://gist.github.com/AayushSameerShah/baeedbbb52fe808874d6debb7e786183 (논문 정의와 다른 것 같음,,,)
+
+수정.. : https://stats.stackexchange.com/questions/260615/what-is-the-difference-between-rrmse-and-rmsre
+
+fmi 참고 : https://bookdown.org/mwheymans/bookmi/measures-of-missing-data-information.html
+```{r}
+calculate_imputation_metrics_10 <- function(data, true) {
+  # 진짜 값
+  Ytrue <- true
+  
+  # 대체된 값들
+  Yimputed <- rowMeans(data)
+  
+  # 1. 편향(bias)
+  estimated_means <- mean(Yimputed)
+  bias <- mean(Ytrue) - estimated_means
+  
+  # 2. RMSE 계산
+  miss = 0.1*length(true)
+  n = length(true)
+  rmse = (1/n) * sqrt((1/miss)*sum((Ytrue-Yimputed)^2))
+  
+  # 3. 분자
+  upper = mean((Ytrue-Yimputed)^2)
+  
+  # 4. 분모
+  below = sum(Yimputed^2)
+  RRMSE = sqrt(upper/below)
+  
+  # 5. 분산 계산
+  D <- ncol(data)  # 대체값의 수
+  Wd <- apply(data,2,var)  # 각 대체값의 분산
+  B <- (1/4)*sum((apply(data,2,mean)-mean(Yimputed))^2)  # 평균의 분산
+  
+  # 평균 내부 대체 분산
+  W <- mean(Wd)
+  
+  # 총 분산
+  total_variance <- W + (1 + 1/D) * B
+  
+  #fmi
+  fmi = (1+1/D) * (B/total_variance)
+  
+  # 결과 리스트 생성
+  results <- list(
+    Bias = bias,
+    RMSE = rmse,
+    RRMSE = RRMSE,
+    Variance = total_variance,
+    FMI = fmi
+  )
+  
+  return(results)
+}
+
+calculate_imputation_metrics_40 <- function(data, true) {
+  # 진짜 값
+  Ytrue <- true
+  
+  # 대체된 값들
+  Yimputed <- rowMeans(data)
+  
+  # 1. 편향(bias)
+  estimated_means <- mean(Yimputed)
+  bias <- mean(Ytrue) - estimated_means
+  
+  # 2. RMSE 계산
+  miss = 0.4*length(true)
+  n = length(true)
+  rmse = (1/n) * sqrt((1/miss)*sum((Ytrue-Yimputed)^2))
+  
+  # 3. 분자
+  upper = mean((Ytrue-Yimputed)^2)
+  
+  # 4. 분모
+  below = sum(Yimputed^2)
+  RRMSE = sqrt(upper/below)
+  
+  # 5. 분산 계산
+  D <- ncol(data)  # 대체값의 수
+  Wd <- apply(data,2,var)  # 각 대체값의 분산
+  B <- (1/4)*sum((apply(data,1,mean)-mean(Yimputed))^2)  # 평균의 분산
+  
+  # 평균 내부 대체 분산
+  W <- mean(Wd)
+  
+  # 총 분산
+  total_variance <- W + (1 + 1/D) * B
+  
+  #fmi
+  fmi = (1+1/D) * (B/total_variance)
+  
+  # 결과 리스트 생성
+  results <- list(
+    Bias = bias,
+    RMSE = rmse,
+    RRMSE = RRMSE,
+    Variance = total_variance,
+    FMI = fmi
+  )
+  
+  return(results)
+}
+```
+
+
+HE_glu
+```{r}
+hist(true)
+```
+
+# median version
+```{r}
+calculate_imputation_metrics_10_median <- function(data, true) {
+  # 진짜 값
+  Ytrue <- true
+  
+  # 대체된 값들
+  Yimputed <- rowMeans(data)
+  
+  # 1. 편향(bias)
+  estimated <- median(Yimputed)
+  bias <- median(Ytrue) - estimated
+  
+  # 2. RMSE 계산
+  miss = 0.1*length(true)
+  n = length(true)
+  rmse = (1/n) * sqrt((1/miss)*sum((Ytrue-Yimputed)^2))
+  
+  # 3. 분자
+  upper = mean((Ytrue-Yimputed)^2)
+  
+  # 4. 분모
+  below = sum(Yimputed^2)
+  RRMSE = sqrt(upper/below)
+  
+  # 5. 분산 계산
+  D <- ncol(data)  # 대체값의 수
+  Wd <- apply(data,2,var)  # 각 대체값의 분산
+  B <- (1/4)*sum((apply(data,1,median)-median(Yimputed))^2)  # 평균의 분산
+  
+  # 평균 내부 대체 분산
+  W <- mean(Wd)
+  
+  # 총 분산
+  total_variance <- W + (1 + 1/D) * B
+  
+  #fmi
+  fmi <- (1+1/D) * (B/total_variance)
+  
+  # 결과 리스트 생성
+  results <- list(
+    Bias = bias,
+    RMSE = rmse,
+    RRMSE = RRMSE,
+    Variance = total_variance,
+    FMI = fmi
+  )
+  
+  return(results)
+}
+
+calculate_imputation_metrics_40_median <- function(data, true) {
+  # 진짜 값
+  Ytrue <- true
+  
+  # 대체된 값들
+  Yimputed <- rowMeans(data)
+  
+  # 1. 편향(bias)
+  estimated <- median(Yimputed)
+  bias <- median(Ytrue) - estimated
+  
+  # 2. RMSE 계산
+  miss = 0.4*length(true)
+  n = length(true)
+  rmse = (1/n) * sqrt((1/miss)*sum((Ytrue-Yimputed)^2))
+  
+  # 3. 분자
+  upper = mean((Ytrue-Yimputed)^2)
+  
+  # 4. 분모
+  below = sum(Yimputed^2)
+  RRMSE = sqrt(upper/below)
+  
+  # 5. 분산 계산
+  D <- ncol(data)  # 대체값의 수
+  Wd <- apply(data,2,var)  # 각 대체값의 분산
+  B <- (1/4)*sum((apply(data,1,median)-median(Yimputed))^2)  # 평균의 분산
+  
+  # 평균 내부 대체 분산
+  W <- mean(Wd)
+  
+  # 총 분산
+  total_variance <- W + (1 + 1/D) * B
+  
+  #fmi
+  fmi = (1+1/D) * (B/total_variance)
+  
+  # 결과 리스트 생성
+  results <- list(
+    Bias = bias,
+    RMSE = rmse,
+    RRMSE = RRMSE,
+    Variance = total_variance,
+    FMI = fmi
+  )
+  
+  return(results)
+}
+```
+

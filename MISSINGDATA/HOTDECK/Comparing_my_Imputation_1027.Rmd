@@ -1,0 +1,598 @@
+---
+title: "Comparing_my_imputation"
+author: "2024021609 / Jeong Yunju"
+date: "2024-10-26"
+output: pdf_document
+header-includes:
+- \usepackage{amsmath,amssymb}
+- \usepackage{amsfonts}
+- \usepackage{graphicx}
+- \usepackage{bm}
+- \usepackage{kotex}
+- \usepackage[shortlabels]{enumitem}
+- \usepackage{diagbox}
+---
+
+# LIBRARY
+```{r}
+library(caret)
+library(randomForest)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(readxl)
+```
+
+# DATA
+```{r}
+mar10_rf10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mar10_rf10.csv")
+mar40_rf10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mar40_rf10.csv")
+
+mcar10_rf10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mcar10_rf10.csv")
+mcar40_rf10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mcar40_rf10.csv")
+
+mnar10_rf10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mnar10_rf10.csv")
+mnar40_rf10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mnar40_rf10.csv")
+
+mar10_pmm = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mar10_pmm.csv")
+mar40_pmm = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mar40_pmm.csv")
+
+mcar10_pmm = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mcar10_pmm.csv")
+mcar40_pmm = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mcar40_pmm.csv")
+
+mnar10_pmm = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mnar10_pmm.csv")
+mnar40_pmm = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\fin_imputation\\mnar40_pmm.csv")
+
+complete=read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete.csv")
+true = complete$HE_glu
+```
+
+```{r}
+calculate_imputation_metrics_10 <- function(data, true) {
+  # 진짜 값
+  Ytrue <- true
+  
+  # 대체된 값들
+  Yimputed <- rowMeans(data)
+  
+  # 1. 편향(bias)
+  estimated_means <- mean(Yimputed)
+  bias <- mean(Ytrue) - estimated_means
+  
+  # 2. RMSE 계산
+  miss = 0.1*length(true)
+  n = length(true)
+  rmse = (1/n) * sqrt((1/miss)*sum((Ytrue-Yimputed)^2))
+  
+  # 3. 분자
+  upper = mean((Ytrue-Yimputed)^2)
+  
+  # 4. 분모
+  below = sum(Yimputed^2)
+  RRMSE = sqrt(upper/below)
+  
+  # 5. 분산 계산
+  D <- ncol(data)  # 대체값의 수
+  Wd <- apply(data,2,var)  # 각 대체값의 분산
+  B <- (1/4)*sum((apply(data,1,mean)-mean(Yimputed))^2)  # 평균의 분산
+  
+  # 평균 내부 대체 분산
+  W <- mean(Wd)
+  
+  # 총 분산
+  total_variance <- W + (1 + 1/D) * B
+  
+  #fmi
+  fmi = (1+1/D) * (B/total_variance)
+  
+  # 결과 리스트 생성
+  results <- list(
+    Bias = bias,
+    RMSE = rmse,
+    RRMSE = RRMSE,
+    Variance = total_variance,
+    FMI = fmi
+  )
+  
+  return(results)
+}
+
+calculate_imputation_metrics_40 <- function(data, true) {
+  # 진짜 값
+  Ytrue <- true
+  
+  # 대체된 값들
+  Yimputed <- rowMeans(data)
+  
+  # 1. 편향(bias)
+  estimated_means <- mean(Yimputed)
+  bias <- mean(Ytrue) - estimated_means
+  
+  # 2. RMSE 계산
+  miss = 0.4*length(true)
+  n = length(true)
+  rmse = (1/n) * sqrt((1/miss)*sum((Ytrue-Yimputed)^2))
+  
+  # 3. 분자
+  upper = mean((Ytrue-Yimputed)^2)
+  
+  # 4. 분모
+  below = sum(Yimputed^2)
+  RRMSE = sqrt(upper/below)
+  
+  # 5. 분산 계산
+  D <- ncol(data)  # 대체값의 수
+  Wd <- apply(data,2,var)  # 각 대체값의 분산
+  B <- (1/4)*sum((apply(data,1,mean)-mean(Yimputed))^2)  # 평균의 분산
+  
+  # 평균 내부 대체 분산
+  W <- mean(Wd)
+  
+  # 총 분산
+  total_variance <- W + (1 + 1/D) * B
+  
+  #fmi
+  fmi = (1+1/D) * (B/total_variance)
+  
+  # 결과 리스트 생성
+  results <- list(
+    Bias = bias,
+    RMSE = rmse,
+    RRMSE = RRMSE,
+    Variance = total_variance,
+    FMI = fmi
+  )
+  
+  return(results)
+}
+
+calculate_imputation_metrics_10_median <- function(data, true) {
+  # 진짜 값
+  Ytrue <- true
+  
+  # 대체된 값들
+  Yimputed <- rowMeans(data)
+  
+  # 1. 편향(bias)
+  estimated <- median(Yimputed)
+  bias <- median(Ytrue) - estimated
+  
+  # 2. RMSE 계산
+  miss = 0.1*length(true)
+  n = length(true)
+  rmse = (1/n) * sqrt((1/miss)*sum((Ytrue-Yimputed)^2))
+  
+  # 3. 분자
+  upper = mean((Ytrue-Yimputed)^2)
+  
+  # 4. 분모
+  below = sum(Yimputed^2)
+  RRMSE = sqrt(upper/below)
+  
+  # 5. 분산 계산
+  D <- ncol(data)  # 대체값의 수
+  Wd <- apply(data,2,var)  # 각 대체값의 분산
+  B <- (1/4)*sum((apply(data,1,median)-median(Yimputed))^2)  # 평균의 분산
+  
+  # 평균 내부 대체 분산
+  W <- mean(Wd)
+  
+  # 총 분산
+  total_variance <- W + (1 + 1/D) * B
+  
+  #fmi
+  fmi <- (1+1/D) * (B/total_variance)
+  
+  # 결과 리스트 생성
+  results <- list(
+    Bias = bias,
+    RMSE = rmse,
+    RRMSE = RRMSE,
+    Variance = total_variance,
+    FMI = fmi
+  )
+  
+  return(results)
+}
+
+calculate_imputation_metrics_40_median <- function(data, true) {
+  # 진짜 값
+  Ytrue <- true
+  
+  # 대체된 값들
+  Yimputed <- rowMeans(data)
+  
+  # 1. 편향(bias)
+  estimated <- median(Yimputed)
+  bias <- median(Ytrue) - estimated
+  
+  # 2. RMSE 계산
+  miss = 0.4*length(true)
+  n = length(true)
+  rmse = (1/n) * sqrt((1/miss)*sum((Ytrue-Yimputed)^2))
+  
+  # 3. 분자
+  upper = mean((Ytrue-Yimputed)^2)
+  
+  # 4. 분모
+  below = sum(Yimputed^2)
+  RRMSE = sqrt(upper/below)
+  
+  # 5. 분산 계산
+  D <- ncol(data)  # 대체값의 수
+  Wd <- apply(data,2,var)  # 각 대체값의 분산
+  B <- (1/4)*sum((apply(data,1,median)-median(Yimputed))^2)  # 평균의 분산
+  
+  # 평균 내부 대체 분산
+  W <- mean(Wd)
+  
+  # 총 분산
+  total_variance <- W + (1 + 1/D) * B
+  
+  #fmi
+  fmi = (1+1/D) * (B/total_variance)
+  
+  # 결과 리스트 생성
+  results <- list(
+    Bias = bias,
+    RMSE = rmse,
+    RRMSE = RRMSE,
+    Variance = total_variance,
+    FMI = fmi
+  )
+  
+  return(results)
+}
+```
+
+
+#calculate metric df
+```{r}
+
+all_compare_10 = function(datasets,true_values){
+  results_df = data.frame(
+    Dataset = character(),
+    Bias = numeric(),
+    RMSE = numeric(),
+    RRMSE = numeric(),
+    Variance = numeric(),
+    FMI = numeric()
+  )
+  
+  for(dataset_name in names(datasets)){
+    dataset = datasets[[dataset_name]]
+    metrics = calculate_imputation_metrics_10(dataset,true_values)
+    results_df = rbind(results_df, data.frame(Dataset=dataset_name,Bias=metrics$Bias,RMSE=metrics$RMSE,RRMSE = metrics$RRMSE, Variance=metrics$Variance, FMI=metrics$FMI))
+  }
+  return(results_df)
+}
+
+all_compare_40 = function(datasets,true_values){
+  results_df = data.frame(
+    Dataset = character(),
+    Bias = numeric(),
+    RMSE = numeric(),
+    RRMSE = numeric(),
+    Variance = numeric(),
+    FMI = numeric()
+  )
+  
+  for(dataset_name in names(datasets)){
+    dataset = datasets[[dataset_name]]
+    metrics = calculate_imputation_metrics_40(dataset,true_values)
+    results_df = rbind(results_df, data.frame(Dataset=dataset_name,Bias=metrics$Bias,RMSE=metrics$RMSE,RRMSE = metrics$RRMSE, Variance=metrics$Variance, FMI=metrics$FMI))
+  }
+  return(results_df)
+}
+
+all_compare_10_med = function(datasets,true_values){
+  results_df = data.frame(
+    Dataset = character(),
+    Bias = numeric(),
+    RMSE = numeric(),
+    RRMSE = numeric(),
+    Variance = numeric(),
+    FMI = numeric()
+  )
+  
+  for(dataset_name in names(datasets)){
+    dataset = datasets[[dataset_name]]
+    metrics = calculate_imputation_metrics_10_median(dataset,true_values)
+    results_df = rbind(results_df, data.frame(Dataset=dataset_name,Bias=metrics$Bias,RMSE=metrics$RMSE,RRMSE = metrics$RRMSE, Variance=metrics$Variance, FMI=metrics$FMI))
+  }
+  return(results_df)
+}
+
+all_compare_40_med = function(datasets,true_values){
+  results_df = data.frame(
+    Dataset = character(),
+    Bias = numeric(),
+    RMSE = numeric(),
+    RRMSE = numeric(),
+    Variance = numeric(),
+    FMI = numeric()
+  )
+  
+  for(dataset_name in names(datasets)){
+    dataset = datasets[[dataset_name]]
+    metrics = calculate_imputation_metrics_40_median(dataset,true_values)
+    results_df = rbind(results_df, data.frame(Dataset=dataset_name,Bias=metrics$Bias,RMSE=metrics$RMSE,RRMSE = metrics$RRMSE, Variance=metrics$Variance, FMI=metrics$FMI))
+  }
+  return(results_df)
+}
+```
+
+```{r}
+
+names10 = list("mar10_rf10"=mar10_rf10,"mcar10_rf10"=mcar10_rf10,"mnar10_rf10"=mnar10_rf10, "mar10_pmm" = mar10_pmm, "mcar10_pmm" = mcar10_pmm, "mnar10_pmm"=mnar10_pmm)
+
+names40 = list("mar40_rf10"=mar40_rf10,"mcar40_rf10"=mcar40_rf10,"mnar40_rf10"=mnar40_rf10, "mar40_pmm" = mar40_pmm, "mcar40_pmm" = mcar40_pmm, "mnar40_pmm"=mnar40_pmm)
+
+compare10 = all_compare_10(names10,true)
+compare40 = all_compare_40(names40,true)
+compare10_med = all_compare_10_med(names10,true)
+compare40_med = all_compare_40_med(names40, true)
+```
+
+
+# Final result
+```{r}
+print(compare10)
+print(compare40)
+print(compare10_med)
+print(compare40_med)
+```
+
+# histogram
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mar10_rf10)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mar10_RF",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mar10_rf_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mar40_rf10)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mar40_RF",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mar40_rf_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mcar10_rf10)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mcar10_RF",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mcar10_rf_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mcar40_rf10)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mcar40_RF",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mcar40_rf_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mnar10_rf10)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo=ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mnar10_RF",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mnar10_rf_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mnar40_rf10)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mnar40_RF",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mnar40_rf.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mar10_pmm)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mar10 pmm",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mar10_pmm_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mar40_pmm)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mar40 pmm",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mar40_pmm_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mcar10_pmm)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mcar10 pmm",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mcar10_pmm_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mcar40_pmm)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mcar40 pmm",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mcar40_pmm_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mnar10_pmm)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo =ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mnar10 pmm",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mnar10_pmm_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```
+
+```{r}
+data <- data.frame(true = true, imputed = rowMeans(mnar40_pmm)) %>%
+  filter(true <= 200 & imputed <= 200)
+histo = ggplot() +
+  geom_histogram(data = data, aes(x = true, y = ..density..), fill = "blue", alpha = 0.5, bins = 30) + # 진짜 값 히스토그램
+  geom_histogram(data = data, aes(x = imputed, y = ..density..), fill = "red", alpha = 0.5, bins = 30) + # 대체된 값 평균 히스토그램
+  labs(title = "Histogram of True Values and Imputed Row Means Mnar40 pmm",
+       x = "Values",
+       y = "Density") +
+  theme(
+    panel.background = element_rect(fill = "white"), # 흰색 배경
+    plot.background = element_rect(fill = "white"), # 플롯 배경 흰색
+    panel.grid.major = element_line(color = "grey80"), # 주요 그리드 색상 조정
+    panel.grid.minor = element_blank(), # 부 그리드 제거
+    plot.title = element_text(hjust = 0.5) # 제목 중앙 정렬
+  ) +
+  geom_density(data = data, aes(x = true), color = "blue", size = 1) + # 진짜 값 밀도 곡선
+  geom_density(data = data, aes(x = imputed), color = "red", size = 1) # 대체된 값 평균 밀도 곡선
+ggsave("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\compare_histogram\\mnar40_pmm_filtered.png", plot = histo, width = 10, height = 6, dpi = 300)
+```

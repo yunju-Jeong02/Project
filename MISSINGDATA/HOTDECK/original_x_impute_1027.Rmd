@@ -1,0 +1,189 @@
+---
+title: "X_impute_original_application_1027"
+author: "2024021609 / Jeong Yunju"
+date: "2024-10-27"
+output: pdf_document
+---
+```{r,warning=FALSE}
+library(caret)
+library(randomForest)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(VIM)
+library(readxl)
+library(mice)
+```
+
+# DATA
+```{r}
+final = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\final_drop1to9.csv")
+complete = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete.csv")
+final = final[,-1]
+complete = complete[, -1]
+```
+
+# X_impute for final
+```{r}
+colSums(is.na(final))
+```
+
+```{r}
+set.seed(715)
+final$age_group = ifelse(final$age<20,1,ifelse(final$age >= 40,3,2)) 
+#de1_dg replace
+ind_8 = which(final$DE1_dg==8)
+final$DE1_dg[ind_8] = 0
+
+#NA를 대체..해야함 (nrow 기준 17개 차이남 -> randomsampling함)
+final[is.na(final$DE1_dg),]['DE1_dg'] = sample(c(0,1),3,replace=TRUE,prob=c(0.5,0.5))
+
+#income에 대한 대체
+sum1=sum(final[final$age_group == 1, "incm5"] == 1,na.rm=TRUE)
+sum2=sum(final[final$age_group == 1, "incm5"] == 2,na.rm=TRUE)
+sum3=sum(final[final$age_group == 1, "incm5"] == 3,na.rm=TRUE)
+sum4=sum(final[final$age_group == 1, "incm5"] == 4,na.rm=TRUE)
+sum5=sum(final[final$age_group == 1, "incm5"] == 5,na.rm=TRUE)
+
+#가중치 주고 뽑기(age=1)
+total_sum = sum(sum1, sum2, sum3, sum4, sum5)
+prob = c(sum1, sum2, sum3, sum4, sum5) / total_sum
+n = nrow(final[final$age_group == 1 & is.na(final$incm5), ])
+final[final$age_group == 1 & is.na(final$incm5), ]['incm5'] = sample(1:5,n,prob=prob,replace=TRUE)
+
+#age=2
+sum1=sum(final[final$age_group == 2, "incm5"] == 1,na.rm=TRUE)
+sum2=sum(final[final$age_group == 2, "incm5"] == 2,na.rm=TRUE)
+sum3=sum(final[final$age_group == 2, "incm5"] == 3,na.rm=TRUE)
+sum4=sum(final[final$age_group == 2, "incm5"] == 4,na.rm=TRUE)
+sum5=sum(final[final$age_group == 2, "incm5"] == 5,na.rm=TRUE)
+
+#가중치 주고 뽑기(age=1)
+total_sum = sum(sum1, sum2, sum3, sum4, sum5)
+prob = c(sum1, sum2, sum3, sum4, sum5) / total_sum
+n = nrow(final[final$age_group == 2 & is.na(final$incm5), ])
+final[final$age_group == 2 & is.na(final$incm5), ]['incm5'] = sample(1:5,n,prob=prob,replace=TRUE)
+
+#age=3
+sum1=sum(final[final$age_group == 3, "incm5"] == 1,na.rm=TRUE)
+sum2=sum(final[final$age_group == 3, "incm5"] == 2,na.rm=TRUE)
+sum3=sum(final[final$age_group == 3, "incm5"] == 3,na.rm=TRUE)
+sum4=sum(final[final$age_group == 3, "incm5"] == 4,na.rm=TRUE)
+sum5=sum(final[final$age_group == 3, "incm5"] == 5,na.rm=TRUE)
+
+#가중치 주고 뽑기(age=1)
+total_sum = sum(sum1, sum2, sum3, sum4, sum5)
+prob = c(sum1, sum2, sum3, sum4, sum5) / total_sum
+n = nrow(final[final$age_group == 3 & is.na(final$incm5), ])
+final[final$age_group == 3 & is.na(final$incm5), ]['incm5'] = sample(1:5,n,prob=prob,replace=TRUE)
+
+
+#HE_anem 대체
+sum1=sum(final[final$sex == 1, "HE_anem"] == 0,na.rm=TRUE)
+sum2=sum(final[final$sex == 1, "HE_anem"] == 1,na.rm=TRUE)
+
+#가중치 주고 뽑기(sex=1 : 남자)
+total_sum = sum(sum1, sum2)
+prob = c(sum1, sum2) / total_sum
+n = nrow(final[final$sex == 1 & is.na(final$HE_anem), ])
+final[final$sex == 1 & is.na(final$HE_anem), ]['HE_anem'] = sample(c(0,1),n,prob=prob,replace=TRUE)
+
+#HE_anem 대체
+sum1=sum(final[final$sex == 2, "HE_anem"] == 0,na.rm=TRUE)
+sum2=sum(final[final$sex == 2, "HE_anem"] == 1,na.rm=TRUE)
+
+#가중치 주고 뽑기(sex=2 : 여자)
+total_sum = sum(sum1, sum2)
+prob = c(sum1, sum2) / total_sum
+n = nrow(final[final$sex == 2 & is.na(final$HE_anem), ])
+final[final$sex == 2 & is.na(final$HE_anem), ]['HE_anem'] = sample(c(0,1),n,prob=prob,replace=TRUE)
+```
+```{r}
+set.seed(715)
+simple_hotdeck <- function(data, ...){
+  variable_names = c(...)
+  for (variable_name in variable_names){
+    data = hotdeck(data,variable=variable_name)
+  }
+  return(data)
+}
+
+final = simple_hotdeck(final,"HE_Ucrea","HE_Uph","HE_Ubld","HE_Unitr","HE_Uro","HE_Upro","HE_Usg","HE_rPLS")
+
+colSums(is.na(final))
+```
+
+```{r}
+final = final[,!grepl("imp",names(final))]
+final = final %>% dplyr::select(-age_group)
+
+
+family_hotdeck = function(data, var1,var2,var3,var4){
+  variables = c(var1,var2,var3,var4)
+  data$age_group = cut(
+    data[["age"]],
+    breaks=c(-Inf,20,59,Inf),
+    labels=c("20대 미만","20~59","60세 이상")
+  )
+  data$group = interaction(data$age_group,data$sex,data$region)
+  for(var in variables){
+    data = hotdeck(data,variable=var, domain_var="group")
+  }
+  data = data %>%  dplyr::select(-age_group, -group)
+  return(data)
+}
+
+other_hotdeck = function(data,var1,var2){
+  variables=c(var1,var2)
+  data$age_group = cut(
+    data[["age"]],
+    breaks=c(-Inf,20,59,Inf),
+    labels=c("20대 미만","20~59","60세 이상")
+  )
+  data$group = interaction(data$age_group,data$incm5)
+  for(var in variables){
+    data = hotdeck(data,variable=var, domain_var="group")
+  }
+  data = data %>%  dplyr::select(-age_group, -group)
+  return(data)
+}
+
+set.seed(715)
+final = family_hotdeck(final,"HE_DMfh3","HE_DMfh2","HE_DMfh1","genertn")
+final = other_hotdeck(final,"occp","edu")
+```
+
+```{r}
+colSums(is.na(final))
+final = final[,!grepl("imp",names(final))]
+```
+
+
+```{r}
+set.seed(715)
+#3. hot deck with pmm for DE1_ag→HE_BMI → HE_HbA1c → HE_Uglu → HE_sbp→HE_dbp 
+
+imp_val = c("DE1_ag","HE_BMI","HE_HbA1c","HE_Uglu","HE_sbp","HE_dbp","HE_fst")
+
+impute_and_replace <- function(data, vars) {
+  for (var in vars) {
+    na_indices <- which(is.na(data[[var]]))
+    imputed_data <- mice(data[, vars], m = 1, method = 'pmm', printFlag = FALSE)
+    imputed_values <- complete(imputed_data, 1)
+    if (length(na_indices) > 0) {
+      data[[var]][na_indices] <- imputed_values[[var]][na_indices]
+    }
+  } 
+  return(data)
+}
+
+final = impute_and_replace(final,imp_val)
+```
+
+```{r}
+colSums(is.na(final))
+```
+```{r}
+write.csv(final, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\final_X_imputed.csv", row.names = FALSE)
+```
+

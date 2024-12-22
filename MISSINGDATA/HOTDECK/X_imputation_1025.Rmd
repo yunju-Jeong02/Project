@@ -1,0 +1,227 @@
+---
+title: "imputation_1025"
+author: "2024021609 / Jeong Yunju"
+date: "2024-10-25"
+output: pdf_document
+---
+
+# LIBRARY
+```{r}
+library(caret)
+library(randomForest)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(VIM)
+library(readxl)
+library(mice)
+```
+
+
+# DATA
+```{r}
+mar10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mar10.csv")
+
+mar40 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mar40.csv")
+
+mcar10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mcar10.csv")
+
+mcar40 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mcar40.csv")
+
+mnar10 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mnar10.csv")
+
+mnar40 = read_csv("D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\complete_mnar40.csv")
+```
+
+# Imputation - RandomForest
+
+## making m columns
+```{r}
+mar10$m = ifelse(is.na(mar10$HE_glu),1,0)
+
+mar40$m = ifelse(is.na(mar40$HE_glu),1,0)
+
+mcar10$m = ifelse(is.na(mcar10$HE_glu),1,0)
+
+mcar40$m = ifelse(is.na(mcar40$HE_glu),1,0)
+
+mnar10$m = ifelse(is.na(mnar10$HE_glu),1,0)
+
+mnar40$m = ifelse(is.na(mnar40$HE_glu),1,0)
+```
+
+## X imputation
+```{r}
+colSums(is.na(mar10))
+colSums(is.na(mar40))
+colSums(is.na(mcar10))
+colSums(is.na(mcar40))
+colSums(is.na(mnar10))
+colSums(is.na(mnar40))
+```
+
+### check missing correlated variables
+```{r}
+continuous_vars <- mar10[sapply(mar10, function(x) is.numeric(x) && length(unique(x)) > 2)]
+
+# 상관 행렬 계산
+correlation_matrix <- cor(continuous_vars, use = "complete.obs")
+
+
+correlation_matrix["HE_glu", ]
+correlation_matrix['HE_DMfh3',]
+correlation_matrix["HE_dbp",]
+correlation_matrix["HE_BMI",]
+correlation_matrix["DE1_ag",]
+correlation_matrix["HE_sbp",]
+correlation_matrix["HE_Uglu",]
+correlation_matrix["HE_HbA1c",]
+```
+
+
+## X imputation
+```{r}
+set.seed(715)
+#1. simple hot deck for HE_Ucrea,HE_Uph,HE_Ubld,HE_Unitr,HE_Uro,HE_Upro,HE_Usg,HE_rPLS
+
+simple_hotdeck <- function(data, ...){
+  variable_names = c(...)
+  for (variable_name in variable_names){
+    data = hotdeck(data,variable=variable_name)
+  }
+  return(data)
+}
+
+
+mar10_hd = simple_hotdeck(mar10,"HE_Ucrea","HE_Uph","HE_Ubld","HE_Unitr","HE_Uro","HE_Upro","HE_Usg","HE_rPLS")
+
+mar40_hd = simple_hotdeck(mar40,"HE_Ucrea","HE_Uph","HE_Ubld","HE_Unitr","HE_Uro","HE_Upro","HE_Usg","HE_rPLS")
+
+mcar10_hd = simple_hotdeck(mcar10,"HE_Ucrea","HE_Uph","HE_Ubld","HE_Unitr","HE_Uro","HE_Upro","HE_Usg","HE_rPLS")
+
+mcar40_hd = simple_hotdeck(mcar40,"HE_Ucrea","HE_Uph","HE_Ubld","HE_Unitr","HE_Uro","HE_Upro","HE_Usg","HE_rPLS")
+
+mnar10_hd = simple_hotdeck(mnar10,"HE_Ucrea","HE_Uph","HE_Ubld","HE_Unitr","HE_Uro","HE_Upro","HE_Usg","HE_rPLS")
+
+mnar40_hd = simple_hotdeck(mnar40,"HE_Ucrea","HE_Uph","HE_Ubld","HE_Unitr","HE_Uro","HE_Upro","HE_Usg","HE_rPLS")
+```
+
+```{r}
+colSums(is.na(mar10_hd))
+colSums(is.na(mar40_hd))
+colSums(is.na(mcar10_hd))
+colSums(is.na(mcar40_hd))
+colSums(is.na(mnar10_hd))
+colSums(is.na(mnar40_hd))
+```
+
+
+```{r}
+set.seed(715)
+#2. hot deck with imputation class for HE_DMfh3,E_DMfh2,E_DMfh1,occp,edu
+
+family_hotdeck = function(data, var1,var2,var3){
+  variables = c(var1,var2,var3)
+  data$age_group = cut(
+    data[["age"]],
+    breaks=c(-Inf,20,59,Inf),
+    labels=c("20대 미만","20~59","60세 이상")
+  )
+  data$group = interaction(data$age_group,data$sex,data$region)
+  for(var in variables){
+    data = hotdeck(data,variable=var, domain_var="group")
+  }
+  data = data %>%  select(-age_group, -group)
+  return(data)
+}
+
+other_hotdeck = function(data,var1,var2){
+  variables=c(var1,var2)
+  data$age_group = cut(
+    data[["age"]],
+    breaks=c(-Inf,20,59,Inf),
+    labels=c("20대 미만","20~59","60세 이상")
+  )
+  data$group = interaction(data$age_group,data$incm5)
+  for(var in variables){
+    data = hotdeck(data,variable=var, domain_var="group")
+  }
+  data = data %>%  select(-age_group, -group)
+  return(data)
+}
+
+set.seed(715)
+mar10_hd = family_hotdeck(mar10_hd,"HE_DMfh3","HE_DMfh2","HE_DMfh1")
+mar10_hd = other_hotdeck(mar10_hd,"occp","edu")
+
+mar40_hd = family_hotdeck(mar40_hd,"HE_DMfh3","HE_DMfh2","HE_DMfh1")
+mar40_hd = other_hotdeck(mar40_hd,"occp","edu")
+
+mcar10_hd = family_hotdeck(mcar10_hd,"HE_DMfh3","HE_DMfh2","HE_DMfh1")
+mcar10_hd = other_hotdeck(mcar10_hd,"occp","edu")
+
+mcar40_hd = family_hotdeck(mcar40_hd,"HE_DMfh3","HE_DMfh2","HE_DMfh1")
+mcar40_hd = other_hotdeck(mcar40_hd,"occp","edu")
+
+mnar10_hd = family_hotdeck(mnar10_hd,"HE_DMfh3","HE_DMfh2","HE_DMfh1")
+mnar10_hd = other_hotdeck(mnar10_hd,"occp","edu")
+
+mnar40_hd = family_hotdeck(mnar40_hd,"HE_DMfh3","HE_DMfh2","HE_DMfh1")
+mnar40_hd = other_hotdeck(mnar40_hd,"occp","edu")
+```
+
+```{r}
+colSums(is.na(mar10_hd))
+colSums(is.na(mar40_hd))
+colSums(is.na(mcar10_hd))
+colSums(is.na(mcar40_hd))
+colSums(is.na(mnar10_hd))
+colSums(is.na(mnar40_hd))
+```
+
+
+```{r}
+set.seed(715)
+#3. hot deck with pmm for DE1_ag→HE_BMI → HE_HbA1c → HE_Uglu → HE_sbp→HE_dbp 
+
+imp_val = c("DE1_ag","HE_BMI","HE_HbA1c","HE_Uglu","HE_sbp","HE_dbp")
+
+impute_and_replace <- function(data, vars) {
+  for (var in vars) {
+    na_indices <- which(is.na(data[[var]]))
+    imputed_data <- mice(data[, vars], m = 1, method = 'pmm', printFlag = FALSE)
+    imputed_values <- complete(imputed_data, 1)
+    if (length(na_indices) > 0) {
+      data[[var]][na_indices] <- imputed_values[[var]][na_indices]
+    }
+  } 
+  return(data)
+}
+
+mar10_hd = impute_and_replace(mar10_hd,imp_val)
+mar40_hd = impute_and_replace(mar40_hd,imp_val)
+mcar10_hd = impute_and_replace(mcar10_hd,imp_val)
+mcar40_hd = impute_and_replace(mcar40_hd,imp_val)
+mnar10_hd = impute_and_replace(mnar10_hd,imp_val)
+mnar40_hd = impute_and_replace(mnar40_hd,imp_val)
+```
+
+```{r}
+colSums(is.na(mar10_hd))
+colSums(is.na(mar40_hd))
+colSums(is.na(mcar10_hd))
+colSums(is.na(mcar40_hd))
+colSums(is.na(mnar10_hd))
+colSums(is.na(mnar40_hd))
+```
+
+#Save
+```{r}
+write.csv(mar10_hd, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mar10_hd.csv", row.names = FALSE)
+write.csv(mar40_hd, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mar40_hd.csv", row.names = FALSE)
+write.csv(mcar10_hd, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mcar10_hd.csv", row.names = FALSE)
+write.csv(mcar40_hd, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mcar40_hd.csv", row.names = FALSE)
+write.csv(mnar10_hd, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mnar10_hd.csv", row.names = FALSE)
+write.csv(mnar40_hd, file = "D:\\고려대 족보\\2021\\대학원\\결측자료분석(송주원)\\midterm\\mnar40_hd.csv", row.names = FALSE)
+```
+
